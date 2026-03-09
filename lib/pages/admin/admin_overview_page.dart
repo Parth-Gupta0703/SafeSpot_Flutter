@@ -1,7 +1,16 @@
+// Admin Overview Page — entry point.
+// Charts and data are split into an overview/ subfolder for clarity:
+//
+//   overview/overview_data.dart    — data models + Firestore loaders
+//   overview/overview_widgets.dart — card container, chart helpers, LegendDot
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'admin_dashboard.dart'; // AdminPageHeader
+
+import 'admin_dashboard.dart';
+import 'overview/overview_data.dart';
+import 'overview/overview_widgets.dart';
 
 class AdminOverviewPage extends StatelessWidget {
   const AdminOverviewPage({super.key});
@@ -14,7 +23,6 @@ class AdminOverviewPage extends StatelessWidget {
           isDark ? const Color(0xFF0F1220) : const Color(0xFFF4F8FF),
       body: CustomScrollView(
         slivers: [
-          // FIX: Header now contains title + admin email + logout button
           SliverAppBar(
             expandedHeight: 130,
             pinned: true,
@@ -23,8 +31,7 @@ class AdminOverviewPage extends StatelessWidget {
             flexibleSpace: FlexibleSpaceBar(
               background: AdminPageHeader(
                 title: 'Admin Dashboard',
-                subtitle:
-                    'SafeSpot Control Panel',
+                subtitle: 'SafeSpot Control Panel',
                 iconData: Icons.dashboard_rounded,
                 fromColor: const Color(0xFF6C63FF),
                 toColor: const Color(0xFFFF8FAB),
@@ -53,7 +60,7 @@ class AdminOverviewPage extends StatelessWidget {
     );
   }
 
-  // ── KPI cards ──────────────────────────────────────────────────────────────
+  // ── KPI cards ───────────────────────────────────────────────────────────────
 
   Widget _buildKpiGrid(BuildContext context) {
     return GridView.count(
@@ -151,35 +158,31 @@ class AdminOverviewPage extends StatelessWidget {
     );
   }
 
-  // ── 7-day trend chart ──────────────────────────────────────────────────────
+  // ── 7-day trend chart ───────────────────────────────────────────────────────
 
   Widget _buildTrendChart(BuildContext context) {
-    return _card(
+    return overviewCard(
       context,
       title: '7-Day Activity Trend',
-      // FIX: Added description explaining what each line means
       description:
           'Daily count of new posts created vs content flagged for moderation.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // FIX: Chart legend so each line is explained
-          Wrap(
+          const Wrap(
             spacing: 16,
             runSpacing: 6,
-            children: const [
-              _LegendDot(color: Color(0xFF6C63FF), label: 'New Posts'),
-              _LegendDot(
-                  color: Color(0xFFFF6B6B), label: 'Flagged Posts'),
-              _LegendDot(
-                  color: Color(0xFFFFB84D), label: 'Flagged Comments'),
+            children: [
+              LegendDot(color: Color(0xFF6C63FF), label: 'New Posts'),
+              LegendDot(color: Color(0xFFFF6B6B), label: 'Flagged Posts'),
+              LegendDot(color: Color(0xFFFFB84D), label: 'Flagged Comments'),
             ],
           ),
           const SizedBox(height: 14),
           SizedBox(
             height: 200,
-            child: FutureBuilder<_TrendData>(
-              future: _loadTrendData(),
+            child: FutureBuilder<TrendData>(
+              future: loadTrendData(),
               builder: (_, snap) {
                 if (!snap.hasData) {
                   return const Center(
@@ -187,7 +190,11 @@ class AdminOverviewPage extends StatelessWidget {
                           color: Color(0xFF6C63FF)));
                 }
                 final d = snap.data!;
-                final allVals = [...d.posts, ...d.flaggedPosts, ...d.flaggedComments];
+                final allVals = [
+                  ...d.posts,
+                  ...d.flaggedPosts,
+                  ...d.flaggedComments
+                ];
                 final maxY = (allVals.isEmpty
                         ? 5
                         : allVals.reduce((a, b) => a > b ? a : b) + 2)
@@ -198,14 +205,14 @@ class AdminOverviewPage extends StatelessWidget {
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: false,
-                    getDrawingHorizontalLine: (_) =>
-                        const FlLine(color: Color(0xFFE6EAF2), strokeWidth: 1),
+                    getDrawingHorizontalLine: (_) => const FlLine(
+                        color: Color(0xFFE6EAF2), strokeWidth: 1),
                   ),
                   borderData: FlBorderData(show: false),
                   titlesData: FlTitlesData(
                     leftTitles: const AxisTitles(
-                        sideTitles:
-                            SideTitles(showTitles: true, reservedSize: 28)),
+                        sideTitles: SideTitles(
+                            showTitles: true, reservedSize: 28)),
                     rightTitles: const AxisTitles(
                         sideTitles: SideTitles(showTitles: false)),
                     topTitles: const AxisTitles(
@@ -225,16 +232,18 @@ class AdminOverviewPage extends StatelessWidget {
                             padding: const EdgeInsets.only(top: 4),
                             child: Text(days[i],
                                 style: const TextStyle(
-                                    fontSize: 10, color: Color(0xFF9CACCF))),
+                                    fontSize: 10,
+                                    color: Color(0xFF9CACCF))),
                           );
                         },
                       ),
                     ),
                   ),
                   lineBarsData: [
-                    _line(d.posts, const Color(0xFF6C63FF)),
-                    _line(d.flaggedPosts, const Color(0xFFFF6B6B)),
-                    _line(d.flaggedComments, const Color(0xFFFFB84D)),
+                    overviewLine(d.posts, const Color(0xFF6C63FF)),
+                    overviewLine(d.flaggedPosts, const Color(0xFFFF6B6B)),
+                    overviewLine(
+                        d.flaggedComments, const Color(0xFFFFB84D)),
                   ],
                 ));
               },
@@ -245,17 +254,16 @@ class AdminOverviewPage extends StatelessWidget {
     );
   }
 
-  // ── Role pie + Risk gauge ──────────────────────────────────────────────────
+  // ── Role pie + Risk gauge ───────────────────────────────────────────────────
 
   Widget _buildRoleAndRiskRow(BuildContext context) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: _card(
+          child: overviewCard(
             context,
             title: 'User Roles',
-            // FIX: description explains what the pie shows
             description: 'Breakdown of all accounts by their current role.',
             child: Column(
               children: [
@@ -289,23 +297,24 @@ class AdminOverviewPage extends StatelessWidget {
                         sectionsSpace: 2,
                         centerSpaceRadius: 26,
                         sections: [
-                          _pie(adminN, const Color(0xFF6C63FF), 'Admin'),
-                          _pie(userN, const Color(0xFF00B4D8), 'Users'),
-                          _pie(bannedN, const Color(0xFFFF6B6B), 'Banned'),
+                          overviewPie(adminN, const Color(0xFF6C63FF), 'Admin'),
+                          overviewPie(userN, const Color(0xFF00B4D8), 'Users'),
+                          overviewPie(
+                              bannedN, const Color(0xFFFF6B6B), 'Banned'),
                         ],
                       ));
                     },
                   ),
                 ),
                 const SizedBox(height: 8),
-                Wrap(
+                const Wrap(
                   spacing: 10,
                   runSpacing: 4,
                   alignment: WrapAlignment.center,
-                  children: const [
-                    _LegendDot(color: Color(0xFF6C63FF), label: 'Admins'),
-                    _LegendDot(color: Color(0xFF00B4D8), label: 'Members'),
-                    _LegendDot(color: Color(0xFFFF6B6B), label: 'Banned'),
+                  children: [
+                    LegendDot(color: Color(0xFF6C63FF), label: 'Admins'),
+                    LegendDot(color: Color(0xFF00B4D8), label: 'Members'),
+                    LegendDot(color: Color(0xFFFF6B6B), label: 'Banned'),
                   ],
                 ),
               ],
@@ -314,15 +323,14 @@ class AdminOverviewPage extends StatelessWidget {
         ),
         const SizedBox(width: 10),
         Expanded(
-          child: _card(
+          child: overviewCard(
             context,
             title: 'Moderation Risk',
-            // FIX: description explains what the gauge shows
             description: '% of all posts currently flagged for review.',
-            child: FutureBuilder<_RiskData>(
-              future: _loadRiskData(),
+            child: FutureBuilder<RiskData>(
+              future: loadRiskData(),
               builder: (_, snap) {
-                final r = snap.data ?? const _RiskData(0, 0);
+                final r = snap.data ?? const RiskData(0, 0);
                 final ratio = r.totalPosts == 0
                     ? 0.0
                     : (r.flagged / r.totalPosts).clamp(0.0, 1.0);
@@ -394,17 +402,16 @@ class AdminOverviewPage extends StatelessWidget {
     );
   }
 
-  // ── Top contributors bar chart ─────────────────────────────────────────────
+  // ── Top contributors bar chart ──────────────────────────────────────────────
 
   Widget _buildTopContributors(BuildContext context) {
-    return _card(
+    return overviewCard(
       context,
       title: 'Top Contributors',
-      // FIX: description explains what the bars represent
       description:
-          'Users with the most published posts. Tap a bar for the full username.',
-      child: FutureBuilder<List<MapEntry<String, int>>>(
-        future: _loadTopContributors(),
+          'Users with the most published posts. Shows total posts and flagged posts.',
+      child: FutureBuilder<List<ContributorStats>>(
+        future: loadTopContributors(),
         builder: (_, snap) {
           if (!snap.hasData) {
             return const SizedBox(
@@ -420,24 +427,23 @@ class AdminOverviewPage extends StatelessWidget {
                 child: Center(child: Text('No post data yet')));
           }
           final maxY = (entries
-                      .map((e) => e.value)
+                      .map((e) => e.totalPosts)
                       .fold(0, (a, b) => a > b ? a : b) +
                   2)
               .toDouble();
           return SizedBox(
-            // FIX: extra height for rotated bottom labels
-            height: 240,
+            height: 250,
             child: BarChart(
               BarChartData(
                 maxY: maxY,
                 barTouchData: BarTouchData(
                   touchTooltipData: BarTouchTooltipData(
-                    // FIX: tooltip shows full email + post count on tap
                     getTooltipItem: (group, _, rod, __) {
                       final i = group.x;
                       if (i < 0 || i >= entries.length) return null;
+                      final stat = entries[i];
                       return BarTooltipItem(
-                        '${entries[i].key}\n${rod.toY.toInt()} posts',
+                        '${stat.email}\n${stat.totalPosts} total posts\n${stat.flaggedPosts} flagged',
                         const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
@@ -450,22 +456,25 @@ class AdminOverviewPage extends StatelessWidget {
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  getDrawingHorizontalLine: (_) => const FlLine(
-                      color: Color(0xFFE6EAF2), strokeWidth: 1),
+                  getDrawingHorizontalLine: (_) =>
+                      const FlLine(color: Color(0xFFE6EAF2), strokeWidth: 1),
                 ),
                 barGroups: List.generate(
                   entries.length,
                   (i) => BarChartGroupData(x: i, barRods: [
                     BarChartRodData(
-                      toY: entries[i].value.toDouble(),
-                      gradient: const LinearGradient(
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                        colors: [Color(0xFF6C63FF), Color(0xFFFF8FAB)],
-                      ),
+                      toY: entries[i].totalPosts.toDouble(),
+                      color: const Color(0xFF6C63FF),
                       width: 22,
                       borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(6)),
+                      rodStackItems: [
+                        BarChartRodStackItem(
+                          0,
+                          entries[i].flaggedPosts.toDouble(),
+                          const Color(0xFFFF6B6B),
+                        ),
+                      ],
                     ),
                   ]),
                 ),
@@ -475,24 +484,23 @@ class AdminOverviewPage extends StatelessWidget {
                   rightTitles: const AxisTitles(
                       sideTitles: SideTitles(showTitles: false)),
                   leftTitles: const AxisTitles(
-                    sideTitles: SideTitles(
-                        showTitles: true, reservedSize: 28, interval: 1),
+                    sideTitles:
+                        SideTitles(showTitles: true, reservedSize: 28, interval: 1),
                   ),
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      // FIX: reservedSize increased + labels rotated to prevent overlap
-                      reservedSize: 56,
+                      reservedSize: 66,
                       getTitlesWidget: (v, _) {
                         final i = v.toInt();
                         if (i < 0 || i >= entries.length) {
                           return const SizedBox.shrink();
                         }
-                        final raw = entries[i].key.split('@').first;
+                        final raw = entries[i].email.split('@').first;
                         final label =
                             raw.length > 9 ? '${raw.substring(0, 9)}…' : raw;
                         return Padding(
-                          padding: const EdgeInsets.only(top: 6),
+                          padding: const EdgeInsets.only(top: 8),
                           child: RotatedBox(
                             quarterTurns: 1,
                             child: Text(label,
@@ -513,16 +521,16 @@ class AdminOverviewPage extends StatelessWidget {
     );
   }
 
-  // ── Recent events ──────────────────────────────────────────────────────────
+  // ── Recent events ───────────────────────────────────────────────────────────
 
   Widget _buildRecentEvents(BuildContext context) {
-    return _card(
+    return overviewCard(
       context,
       title: 'Recent Activity',
       description:
           'Latest posts and flagged content across the platform, newest first.',
-      child: FutureBuilder<List<_RecentEvent>>(
-        future: _loadRecentEvents(),
+      child: FutureBuilder<List<RecentEvent>>(
+        future: loadRecentEvents(),
         builder: (_, snap) {
           final events = snap.data ?? const [];
           if (events.isEmpty) {
@@ -548,10 +556,11 @@ class AdminOverviewPage extends StatelessWidget {
                     style: const TextStyle(
                         fontSize: 13, fontWeight: FontWeight.w600)),
                 subtitle: Text(e.subtitle,
-                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 11)),
                 trailing: e.ts != null
-                    ? Text(_timeAgo(e.ts!),
+                    ? Text(overviewTimeAgo(e.ts),
                         style: const TextStyle(
                             fontSize: 10, color: Color(0xFF9CACCF)))
                     : null,
@@ -560,253 +569,6 @@ class AdminOverviewPage extends StatelessWidget {
           );
         },
       ),
-    );
-  }
-
-  // ── Helpers ───────────────────────────────────────────────────────────────
-
-  Widget _card(
-    BuildContext context, {
-    required String title,
-    required Widget child,
-    String description = '',
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1A1F34) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-            color:
-                isDark ? const Color(0xFF2A3554) : const Color(0xFFD8DEEE)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title,
-              style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15,
-                  color: isDark
-                      ? const Color(0xFFE7EDFF)
-                      : const Color(0xFF2D3142))),
-          if (description.isNotEmpty) ...[
-            const SizedBox(height: 3),
-            Text(description,
-                style: const TextStyle(
-                    color: Color(0xFF9CACCF), fontSize: 11)),
-          ],
-          const SizedBox(height: 12),
-          child,
-        ],
-      ),
-    );
-  }
-
-  PieChartSectionData _pie(double value, Color color, String title) {
-    return PieChartSectionData(
-      value: value == 0 ? 0.01 : value,
-      color: color,
-      title: value == 0 ? '' : value.toInt().toString(),
-      titleStyle: const TextStyle(
-          fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
-      radius: 54,
-    );
-  }
-
-  LineChartBarData _line(List<int> values, Color color) {
-    return LineChartBarData(
-      spots: List.generate(
-          values.length, (i) => FlSpot(i.toDouble(), values[i].toDouble())),
-      color: color,
-      isCurved: true,
-      barWidth: 2.5,
-      dotData: FlDotData(
-        show: true,
-        getDotPainter: (_, __, ___, ____) => FlDotCirclePainter(
-            radius: 3,
-            color: color,
-            strokeWidth: 1.5,
-            strokeColor: Colors.white),
-      ),
-    );
-  }
-
-  String _timeAgo(Timestamp ts) {
-    final diff = DateTime.now().difference(ts.toDate());
-    if (diff.inMinutes < 1) return 'just now';
-    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
-    if (diff.inDays < 1) return '${diff.inHours}h ago';
-    if (diff.inDays < 30) return '${diff.inDays}d ago';
-    return '${(diff.inDays / 30).floor()}mo ago';
-  }
-
-  // ── Data loaders ──────────────────────────────────────────────────────────
-
-  Future<_TrendData> _loadTrendData() async {
-    final start = DateTime.now().subtract(const Duration(days: 6));
-    final snaps = await Future.wait([
-      FirebaseFirestore.instance
-          .collection('User Posts')
-          .where('TimeStamp',
-              isGreaterThanOrEqualTo: Timestamp.fromDate(start))
-          .get(),
-      FirebaseFirestore.instance
-          .collection('Moderated Posts')
-          .where('TimeStamp',
-              isGreaterThanOrEqualTo: Timestamp.fromDate(start))
-          .get(),
-      FirebaseFirestore.instance
-          .collection('Moderated Comments')
-          .where('TimeStamp',
-              isGreaterThanOrEqualTo: Timestamp.fromDate(start))
-          .get(),
-    ]);
-    List<int> count(QuerySnapshot<Map<String, dynamic>> s) {
-      final out = List<int>.filled(7, 0);
-      for (final d in s.docs) {
-        final ts = d.data()['TimeStamp'];
-        if (ts is! Timestamp) continue;
-        final idx = ts.toDate().weekday - 1;
-        if (idx >= 0 && idx < 7) out[idx]++;
-      }
-      return out;
-    }
-    return _TrendData(count(snaps[0]), count(snaps[1]), count(snaps[2]));
-  }
-
-  Future<_RiskData> _loadRiskData() async {
-    final snaps = await Future.wait([
-      FirebaseFirestore.instance.collection('User Posts').get(),
-      FirebaseFirestore.instance.collection('Moderated Posts').get(),
-      FirebaseFirestore.instance.collection('Moderated Comments').get(),
-    ]);
-    return _RiskData(
-      snaps[0].docs.length,
-      snaps[1].docs.length + snaps[2].docs.length,
-    );
-  }
-
-  Future<List<MapEntry<String, int>>> _loadTopContributors() async {
-    final snap = await FirebaseFirestore.instance
-        .collection('User Posts')
-        .limit(300)
-        .get();
-    final map = <String, int>{};
-    for (final doc in snap.docs) {
-      final email =
-          (doc.data()['UserEmail'] ?? '').toString().trim().toLowerCase();
-      if (!email.contains('@')) continue;
-      map[email] = (map[email] ?? 0) + 1;
-    }
-    final list = map.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    return list.take(6).toList();
-  }
-
-  Future<List<_RecentEvent>> _loadRecentEvents() async {
-    final snaps = await Future.wait([
-      FirebaseFirestore.instance
-          .collection('User Posts')
-          .orderBy('TimeStamp', descending: true)
-          .limit(5)
-          .get(),
-      FirebaseFirestore.instance
-          .collection('Moderated Posts')
-          .orderBy('TimeStamp', descending: true)
-          .limit(5)
-          .get(),
-      FirebaseFirestore.instance
-          .collection('Moderated Comments')
-          .orderBy('TimeStamp', descending: true)
-          .limit(5)
-          .get(),
-    ]);
-    final events = <_RecentEvent>[];
-    for (final doc in snaps[0].docs) {
-      events.add(_RecentEvent(
-          icon: Icons.article_rounded,
-          color: const Color(0xFF6C63FF),
-          title: 'New post by ${doc.data()['UserEmail'] ?? 'unknown'}',
-          subtitle: (doc.data()['Message'] ?? '').toString(),
-          ts: doc.data()['TimeStamp'] as Timestamp?));
-    }
-    for (final doc in snaps[1].docs) {
-      events.add(_RecentEvent(
-          icon: Icons.flag_rounded,
-          color: const Color(0xFFFF6B6B),
-          title: 'Post flagged — ${doc.data()['Reason'] ?? 'unknown reason'}',
-          subtitle:
-              (doc.data()['Message'] ?? doc.data()['Text'] ?? '').toString(),
-          ts: doc.data()['TimeStamp'] as Timestamp?));
-    }
-    for (final doc in snaps[2].docs) {
-      events.add(_RecentEvent(
-          icon: Icons.comment_rounded,
-          color: const Color(0xFFFFB84D),
-          title:
-              'Comment flagged — ${doc.data()['Reason'] ?? 'unknown reason'}',
-          subtitle:
-              (doc.data()['Comment'] ?? doc.data()['Text'] ?? '').toString(),
-          ts: doc.data()['TimeStamp'] as Timestamp?));
-    }
-    events.sort((a, b) => (b.ts?.millisecondsSinceEpoch ?? 0)
-        .compareTo(a.ts?.millisecondsSinceEpoch ?? 0));
-    return events;
-  }
-}
-
-// ── Data models ───────────────────────────────────────────────────────────────
-
-class _TrendData {
-  const _TrendData(this.posts, this.flaggedPosts, this.flaggedComments);
-  final List<int> posts;
-  final List<int> flaggedPosts;
-  final List<int> flaggedComments;
-}
-
-class _RiskData {
-  const _RiskData(this.totalPosts, this.flagged);
-  final int totalPosts;
-  final int flagged;
-}
-
-class _RecentEvent {
-  const _RecentEvent(
-      {required this.icon,
-      required this.color,
-      required this.title,
-      required this.subtitle,
-      required this.ts});
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String subtitle;
-  final Timestamp? ts;
-}
-
-// ── Shared legend dot (exported for use in other pages too) ──────────────────
-
-class _LegendDot extends StatelessWidget {
-  const _LegendDot({required this.color, required this.label});
-  final Color color;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-            width: 10,
-            height: 10,
-            decoration:
-                BoxDecoration(color: color, shape: BoxShape.circle)),
-        const SizedBox(width: 5),
-        Text(label,
-            style: const TextStyle(fontSize: 11, color: Color(0xFF677489))),
-      ],
     );
   }
 }
