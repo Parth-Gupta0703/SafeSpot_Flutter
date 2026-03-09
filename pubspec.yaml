@@ -40,7 +40,7 @@ dependencies:
   cloud_firestore: ^6.1.2
   http: ^1.2.2
   timeago: ^3.7.1
-  google_fonts: ^8.0.0
+  google_fonts: ^8.0.2
   flutter_native_splash: ^2.4.7
   flutter_launcher_icons: ^0.14.4
   fl_chart: ^1.1.1

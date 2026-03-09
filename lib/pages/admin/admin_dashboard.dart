@@ -26,23 +26,19 @@ class _AdminDashboardState extends State<AdminDashboard>
   ];
 
   final List<_NavItem> _navItems = const [
-    _NavItem(Icons.dashboard_rounded, Icons.dashboard_outlined, "Overview"),
-    _NavItem(Icons.people_rounded, Icons.people_outline_rounded, "Users"),
-    _NavItem(Icons.article_rounded, Icons.article_outlined, "Posts"),
-    _NavItem(Icons.shield_rounded, Icons.shield_outlined, "Moderation"),
+    _NavItem(Icons.dashboard_rounded, Icons.dashboard_outlined, 'Overview'),
+    _NavItem(Icons.people_rounded, Icons.people_outline_rounded, 'Users'),
+    _NavItem(Icons.article_rounded, Icons.article_outlined, 'Posts'),
+    _NavItem(Icons.shield_rounded, Icons.shield_outlined, 'Moderation'),
   ];
 
   @override
   void initState() {
     super.initState();
     _fadeController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 250),
-    );
-    _fadeAnimation = CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeInOut,
-    );
+        vsync: this, duration: const Duration(milliseconds: 250));
+    _fadeAnimation =
+        CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut);
     _fadeController.forward();
   }
 
@@ -64,75 +60,16 @@ class _AdminDashboardState extends State<AdminDashboard>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        actions: [
-          const SizedBox(width: 8),
-          IconButton(
-            icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: const Icon(Icons.logout, color: Color(0xFFFF6B6B)),
-            ),
-            onPressed: () {
-              // Show confirmation dialog
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  title: Row(
-                    children: const [
-                      Icon(Icons.logout, color: Color(0xFFFF6B6B)),
-                      SizedBox(width: 12),
-                      Text('Logout?'),
-                    ],
-                  ),
-                  content: const Text('Are you sure you want to logout?'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel'),
-                    ),
-                    ElevatedButton(
-                      onPressed: () async {
-                        Navigator.pop(context);
-                        await FirebaseAuth.instance.signOut();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFF6B6B),
-                      ),
-                      child: const Text('Logout'),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          const SizedBox(width: 16),
-        ],
-      ),
-      backgroundColor: isDark
-          ? const Color(0xFF0F1220)
-          : const Color(0xFFF4F8FF),
+      // FIX: No outer AppBar — each page owns its own header via SliverAppBar.
+      // The logout button is now in every page header, properly contextualized.
+      backgroundColor:
+          isDark ? const Color(0xFF0F1220) : const Color(0xFFF4F8FF),
       body: FadeTransition(opacity: _fadeAnimation, child: _pages[_index]),
-      bottomNavigationBar: _buildBottomNav(),
+      bottomNavigationBar: _buildBottomNav(isDark),
     );
   }
 
-  Widget _buildBottomNav() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  Widget _buildBottomNav(bool isDark) {
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF171D31) : Colors.white,
@@ -146,7 +83,6 @@ class _AdminDashboardState extends State<AdminDashboard>
         border: Border(
           top: BorderSide(
             color: isDark ? const Color(0xFF2A3454) : const Color(0xFFD7DCE5),
-            width: 1,
           ),
         ),
       ),
@@ -171,8 +107,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                   decoration: BoxDecoration(
                     gradient: isSelected
                         ? const LinearGradient(
-                            colors: [Color(0xFF6C63FF), Color(0xFFFF8FAB)],
-                          )
+                            colors: [Color(0xFF6C63FF), Color(0xFFFF8FAB)])
                         : null,
                     borderRadius: BorderRadius.circular(30),
                   ),
@@ -184,8 +119,8 @@ class _AdminDashboardState extends State<AdminDashboard>
                         color: isSelected
                             ? Colors.white
                             : (isDark
-                                  ? const Color(0xFF9BA8CC)
-                                  : const Color(0xFF677489)),
+                                ? const Color(0xFF9BA8CC)
+                                : const Color(0xFF677489)),
                         size: 22,
                       ),
                       if (isSelected) ...[
@@ -193,10 +128,9 @@ class _AdminDashboardState extends State<AdminDashboard>
                         Text(
                           item.label,
                           style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                          ),
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13),
                         ),
                       ],
                     ],
@@ -216,4 +150,155 @@ class _NavItem {
   final IconData icon;
   final String label;
   const _NavItem(this.activeIcon, this.icon, this.label);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared header widget used in every sub-page's SliverAppBar.flexibleSpace.
+// Includes a logout button in the trailing position so it's always accessible
+// but is clearly part of the page header, not floating over the title.
+// ─────────────────────────────────────────────────────────────────────────────
+class AdminPageHeader extends StatelessWidget {
+  const AdminPageHeader({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.iconData,
+    required this.fromColor,
+    required this.toColor,
+    this.extra,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData iconData;
+  final Color fromColor;
+  final Color toColor;
+  final Widget? extra;
+
+  static void logout(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.logout_rounded, color: Color(0xFFFF6B6B)),
+            SizedBox(width: 10),
+            Text('Logout?', style: TextStyle(fontWeight: FontWeight.w700)),
+          ],
+        ),
+        content: Text(
+          'Signed in as:\n${FirebaseAuth.instance.currentUser?.email ?? 'admin'}',
+          style: const TextStyle(color: Color(0xFF677489)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel',
+                style: TextStyle(color: Color(0xFF677489))),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await FirebaseAuth.instance.signOut();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF6B6B),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Logout',
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? [
+                  fromColor.withValues(alpha: 0.20),
+                  toColor.withValues(alpha: 0.20)
+                ]
+              : [
+                  fromColor.withValues(alpha: 0.15),
+                  toColor.withValues(alpha: 0.15)
+                ],
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 52, 20, 14),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [fromColor, toColor]),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: toColor.withValues(alpha: 0.35),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Icon(iconData, color: Colors.white, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(title,
+                    style: TextStyle(
+                      color: isDark
+                          ? const Color(0xFFE7EDFF)
+                          : const Color(0xFF2D3142),
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    )),
+                Text(subtitle,
+                    style: TextStyle(
+                      color: isDark
+                          ? const Color(0xFF9CACCF)
+                          : const Color(0xFF677489),
+                      fontSize: 12,
+                    ),
+                    overflow: TextOverflow.ellipsis),
+              ],
+            ),
+          ),
+          if (extra != null) ...[const SizedBox(width: 8), extra!],
+          const SizedBox(width: 8),
+          Tooltip(
+            message: 'Logout',
+            child: GestureDetector(
+              onTap: () => logout(context),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF6B6B).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                      color: const Color(0xFFFF6B6B).withValues(alpha: 0.35)),
+                ),
+                child: const Icon(Icons.logout_rounded,
+                    color: Color(0xFFFF6B6B), size: 18),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

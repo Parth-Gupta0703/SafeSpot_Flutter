@@ -1,7 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:social_media/auth/auth.dart';
-import 'package:social_media/theme/app_theme.dart';
+//import 'package:social_media/theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,9 +17,9 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'SafeSpot',
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
-      themeMode: ThemeMode.system,
+      // theme: AppTheme.light(),
+      // darkTheme: AppTheme.dark(),
+      // themeMode: ThemeMode.system,
       home: const Auth(),
     );
   }
