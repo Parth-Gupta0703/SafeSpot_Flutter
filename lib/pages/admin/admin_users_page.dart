@@ -79,18 +79,20 @@ class _AdminUsersPageState extends State<AdminUsersPage>
                 builder: (context, snap) {
                   final docs = snap.data?.docs ?? const [];
                   final admins = docs
-                      .where((d) =>
-                          (d.data()['role'] ?? '')
-                              .toString()
-                              .toLowerCase() ==
-                          'admin')
+                      .where(
+                        (d) =>
+                            (d.data()['role'] ?? '').toString().toLowerCase() ==
+                            'admin',
+                      )
                       .length;
                   final banned = docs
-                      .where((d) =>
-                          (d.data()['status'] ?? '')
-                              .toString()
-                              .toLowerCase() ==
-                          'banned')
+                      .where(
+                        (d) =>
+                            (d.data()['status'] ?? '')
+                                .toString()
+                                .toLowerCase() ==
+                            'banned',
+                      )
                       .length;
                   return AdminPageHeader(
                     title: 'User Management',
@@ -132,22 +134,23 @@ class _AdminUsersPageState extends State<AdminUsersPage>
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
                           icon: Icon(Icons.close_rounded, color: muted),
-                          onPressed: () =>
-                              setState(() => _searchQuery = ''),
+                          onPressed: () => setState(() => _searchQuery = ''),
                         )
                       : null,
                   filled: true,
                   fillColor: card,
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: border)),
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: border),
+                  ),
                   enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: border)),
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: border),
+                  ),
                   focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide:
-                          const BorderSide(color: Color(0xFF6C63FF))),
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: Color(0xFF6C63FF)),
+                  ),
                 ),
               ),
             ),
@@ -161,8 +164,7 @@ class _AdminUsersPageState extends State<AdminUsersPage>
                 builder: (context, snap) {
                   if (snap.connectionState == ConnectionState.waiting &&
                       !snap.hasData) {
-                    return const Center(
-                        child: CircularProgressIndicator());
+                    return const Center(child: CircularProgressIndicator());
                   }
 
                   // Build AdminUser list from Firestore docs
@@ -174,15 +176,12 @@ class _AdminUsersPageState extends State<AdminUsersPage>
                         .trim()
                         .toLowerCase();
                     if (!email.contains('@')) continue;
-                    final role = (data['role'] ?? '')
-                                .toString()
-                                .toLowerCase() ==
-                            'admin'
+                    final role =
+                        (data['role'] ?? '').toString().toLowerCase() == 'admin'
                         ? 'admin'
                         : 'user';
-                    final status = (data['status'] ?? '')
-                                .toString()
-                                .toLowerCase() ==
+                    final status =
+                        (data['status'] ?? '').toString().toLowerCase() ==
                             'banned'
                         ? 'banned'
                         : 'active';
@@ -199,32 +198,34 @@ class _AdminUsersPageState extends State<AdminUsersPage>
                       continue;
                     }
 
-                    users.add(AdminUser(
-                      email: email,
-                      username: (data['username'] ?? '').toString(),
-                      role: role,
-                      status: status,
-                      ref: doc.reference,
-                      banReason: (data['banReason'] ?? '').toString(),
-                      bannedAt: data['bannedAt'] as Timestamp?,
-                      postCount: null,
-                    ));
+                    users.add(
+                      AdminUser(
+                        email: email,
+                        username: (data['username'] ?? '').toString(),
+                        role: role,
+                        status: status,
+                        ref: doc.reference,
+                        banReason: (data['banReason'] ?? '').toString(),
+                        bannedAt: data['bannedAt'] as Timestamp?,
+                        postCount: null,
+                      ),
+                    );
                   }
                   users.sort((a, b) => a.email.compareTo(b.email));
 
                   if (users.isEmpty) {
                     return Center(
-                      child: Text('No users found',
-                          style: TextStyle(color: muted)),
+                      child: Text(
+                        'No users found',
+                        style: TextStyle(color: muted),
+                      ),
                     );
                   }
 
                   return ListView.separated(
-                    padding:
-                        const EdgeInsets.fromLTRB(16, 8, 16, 20),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
                     itemCount: users.length,
-                    separatorBuilder: (_, __) =>
-                        const SizedBox(height: 10),
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
                     itemBuilder: (_, i) => UserTile(
                       user: users[i],
                       myEmail: _myEmail,
@@ -232,8 +233,7 @@ class _AdminUsersPageState extends State<AdminUsersPage>
                       textColor: text,
                       mutedColor: muted,
                       borderColor: border,
-                      onAction: (action) =>
-                          _handleAction(users[i], action),
+                      onAction: (action) => _handleAction(users[i], action),
                     ),
                   );
                 },
@@ -246,64 +246,119 @@ class _AdminUsersPageState extends State<AdminUsersPage>
   }
 
   // ── Action handler ──────────────────────────────────────────────────────────
-
   Future<void> _handleAction(AdminUser user, UserAction action) async {
     switch (action) {
       case UserAction.viewDetails:
-        await showUserDetailsSheet(context,
-            email: user.email,
-            username: user.username,
-            role: user.role,
-            status: user.status,
-            banReason: user.banReason,
-            bannedAt: user.bannedAt);
+        await showUserDetailsSheet(
+          context,
+          email: user.email,
+          username: user.username,
+          role: user.role,
+          status: user.status,
+          banReason: user.banReason,
+          bannedAt: user.bannedAt,
+        );
+        return;
 
       case UserAction.promoteToAdmin:
-        if (user.ref == null) { _snack('Cannot promote unregistered user.'); return; }
-        if (!await showUserConfirmDialog(context,
-            title: 'Promote to Admin?',
-            message: 'Grant full admin access to ${user.email}?')) return;
+        if (user.ref == null) {
+          _snack('Cannot promote unregistered user.');
+          return;
+        }
+
+        if (!await showUserConfirmDialog(
+          context,
+          title: 'Promote to Admin?',
+          message: 'Grant full admin access to ${user.email}?',
+        ))
+          return;
+
         try {
           await user.ref!.update({'role': 'admin'});
           _snack('✅ ${user.email} promoted to admin');
-        } catch (e) { _snack('Failed to promote: $e'); }
+        } catch (e) {
+          _snack('Failed to promote: $e');
+        }
+        return;
 
       case UserAction.demoteFromAdmin:
-        if (user.ref == null) { _snack('Cannot demote unregistered user.'); return; }
-        if (user.email == _myEmail) { _snack('⚠️ You cannot demote yourself'); return; }
-        if (!await showUserConfirmDialog(context,
-            title: 'Demote Admin?',
-            message: 'Remove admin access from ${user.email}?')) return;
+        if (user.ref == null) {
+          _snack('Cannot demote unregistered user.');
+          return;
+        }
+
+        if (user.email == _myEmail) {
+          _snack('⚠️ You cannot demote yourself');
+          return;
+        }
+
+        if (!await showUserConfirmDialog(
+          context,
+          title: 'Demote Admin?',
+          message: 'Remove admin access from ${user.email}?',
+        ))
+          return;
+
         try {
           await user.ref!.update({'role': 'user'});
           _snack('User demoted to member');
-        } catch (e) { _snack('Failed to demote: $e'); }
+        } catch (e) {
+          _snack('Failed to demote: $e');
+        }
+        return;
 
       case UserAction.banUser:
-        if (user.ref == null) { _snack('Cannot ban a user without a profile reference.'); return; }
-        final reason = await showUserTextInputDialog(context,
-            title: 'Ban Reason', hint: 'Why are you banning this user?');
+        if (user.ref == null) {
+          _snack('Cannot ban a user without a profile reference.');
+          return;
+        }
+
+        final reason = await showUserTextInputDialog(
+          context,
+          title: 'Ban Reason',
+          hint: 'Why are you banning this user?',
+        );
+
         if (reason == null || reason.trim().isEmpty) return;
-        if (!await showUserConfirmDialog(context,
-            title: 'Ban User?',
-            message: '${user.email} will be blocked from accessing the app.')) return;
+
+        if (!await showUserConfirmDialog(
+          context,
+          title: 'Ban User?',
+          message: '${user.email} will be blocked from accessing the app.',
+        ))
+          return;
+
         try {
           await user.ref!.update({
-            'status': 'banned', 'banReason': reason.trim(),
-            'bannedAt': Timestamp.now(), 'bannedBy': _myEmail,
+            'status': 'banned',
+            'banReason': reason.trim(),
+            'bannedAt': Timestamp.now(),
+            'bannedBy': _myEmail,
           });
-          await queueEmail(user.email,
-              'Your SafeSpot account has been suspended',
-              'Your account was suspended.\nReason: ${reason.trim()}\n\nIf you believe this is a mistake, please contact support.',
-              fromAdmin: _myEmail);
+
+          await queueEmail(
+            user.email,
+            'Your SafeSpot account has been suspended',
+            'Your account was suspended.\nReason: ${reason.trim()}\n\nIf you believe this is a mistake, please contact support.',
+            fromAdmin: _myEmail,
+          );
+
           _snack('User banned and notification queued');
-        } catch (e) { _snack('Error banning user: $e'); }
+        } catch (e) {
+          _snack('Error banning user: $e');
+        }
+        return;
 
       case UserAction.unbanUser:
         if (user.ref == null) return;
-        if (!await showUserConfirmDialog(context,
-            title: 'Unban User?',
-            message: '${user.email} will regain access to the app.')) return;
+
+        if (!await showUserConfirmDialog(
+          context,
+          title: 'Unban User?',
+          message: '${user.email} will regain access to the app.',
+        ))
+          return;
+
         try {
           await user.ref!.update({
             'status': 'active',
@@ -311,22 +366,38 @@ class _AdminUsersPageState extends State<AdminUsersPage>
             'bannedAt': FieldValue.delete(),
             'bannedBy': FieldValue.delete(),
           });
-          await queueEmail(user.email,
-              'Your SafeSpot account has been reactivated',
-              'Your account suspension has been lifted. Welcome back!',
-              fromAdmin: _myEmail);
+
+          await queueEmail(
+            user.email,
+            'Your SafeSpot account has been reactivated',
+            'Your account suspension has been lifted. Welcome back!',
+            fromAdmin: _myEmail,
+          );
+
           _snack('User unbanned');
-        } catch (e) { _snack('Error unbanning user: $e'); }
+        } catch (e) {
+          _snack('Error unbanning user: $e');
+        }
+        return;
 
       case UserAction.changeUsername:
         if (user.ref == null) return;
-        final reason = await showUserTextInputDialog(context,
-            title: 'Request Username Change',
-            hint: 'Why should this user change their username?');
+
+        final reason = await showUserTextInputDialog(
+          context,
+          title: 'Request Username Change',
+          hint: 'Why should this user change their username?',
+        );
+
         if (reason == null || reason.trim().isEmpty) return;
-        if (!await showUserConfirmDialog(context,
-            title: 'Send Username Change Request?',
-            message: 'An email will be sent to ${user.email}.')) return;
+
+        if (!await showUserConfirmDialog(
+          context,
+          title: 'Send Username Change Request?',
+          message: 'An email will be sent to ${user.email}.',
+        ))
+          return;
+
         try {
           await user.ref!.update({
             'usernameChangeRequested': true,
@@ -334,38 +405,62 @@ class _AdminUsersPageState extends State<AdminUsersPage>
             'usernameChangeRequestedAt': Timestamp.now(),
             'usernameChangeRequestedBy': _myEmail,
           });
-          await queueEmail(user.email,
-              'Action required: Update your SafeSpot username',
-              'An admin has requested you change your username.\nReason: ${reason.trim()}',
-              fromAdmin: _myEmail);
+
+          await queueEmail(
+            user.email,
+            'Action required: Update your SafeSpot username',
+            'An admin has requested you change your username.\nReason: ${reason.trim()}',
+            fromAdmin: _myEmail,
+          );
+
           _snack('Username change request sent');
-        } catch (e) { _snack('Error: $e'); }
+        } catch (e) {
+          _snack('Error: $e');
+        }
+        return;
 
       case UserAction.removeUserData:
-        if (!await showUserConfirmDialog(context,
-            title: 'Remove User Data?',
-            message: 'This permanently deletes all posts, comments, and the profile for ${user.email}. Cannot be undone.')) return;
+        if (!await showUserConfirmDialog(
+          context,
+          title: 'Remove User Data?',
+          message:
+              'This permanently deletes all posts, comments, and the profile for ${user.email}. Cannot be undone.',
+        ))
+          return;
+
         try {
           final batch = FirebaseFirestore.instance.batch();
+
           await collectForDeletion(batch, 'User Posts', user.email);
           await collectForDeletion(batch, 'Moderated Posts', user.email);
           await collectForDeletion(batch, 'Moderated Comments', user.email);
+
           await batch.commit();
+
           await deleteCollectionGroup('Comments', user.email);
           await deleteCollectionGroup('Replies', user.email);
+
           if (user.ref != null) await user.ref!.delete();
-          await queueEmail(user.email,
-              'Your SafeSpot account has been removed',
-              'Your account and all associated data have been permanently removed by a SafeSpot admin.',
-              fromAdmin: _myEmail);
+
+          await queueEmail(
+            user.email,
+            'Your SafeSpot account has been removed',
+            'Your account and all associated data have been permanently removed by a SafeSpot admin.',
+            fromAdmin: _myEmail,
+          );
+
           _snack('User data removed');
-        } catch (e) { _snack('Error removing user data: $e'); }
+        } catch (e) {
+          _snack('Error removing user data: $e');
+        }
+        return;
     }
   }
 
   void _snack(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating));
+      SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
+    );
   }
 }

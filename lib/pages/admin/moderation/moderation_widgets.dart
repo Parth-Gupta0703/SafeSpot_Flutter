@@ -20,7 +20,11 @@ class ReasonChip extends StatelessWidget {
       ),
       child: Text(
         reason,
-        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
         overflow: TextOverflow.ellipsis,
       ),
     );
@@ -52,7 +56,10 @@ class TypeChip extends StatelessWidget {
       child: Text(
         text,
         style: TextStyle(
-            color: textColor, fontSize: 11, fontWeight: FontWeight.w600),
+          color: textColor,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -75,7 +82,11 @@ class CountPill extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -108,21 +119,30 @@ class ContextBlock extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  color: color,
-                  letterSpacing: 0.8)),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: color,
+              letterSpacing: 0.8,
+            ),
+          ),
           const SizedBox(height: 6),
-          Text(text,
-              style: const TextStyle(
-                  color: Color(0xFF3C4659), fontSize: 13, height: 1.5)),
+          Text(
+            text,
+            style: const TextStyle(
+              color: Color(0xFF3C4659),
+              fontSize: 13,
+              height: 1.5,
+            ),
+          ),
           if (email != null) ...[
             const SizedBox(height: 6),
-            Text(email!,
-                style:
-                    const TextStyle(color: Color(0xFF9CACCF), fontSize: 11)),
+            Text(
+              email!,
+              style: const TextStyle(color: Color(0xFF9CACCF), fontSize: 11),
+            ),
           ],
         ],
       ),
