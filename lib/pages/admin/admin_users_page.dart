@@ -1,6 +1,5 @@
-// Admin User Management Page — entry point.
-// Logic is split across a users/ subfolder for clarity:
-//
+// Admin User Management Page
+// Logic is split across a users/ subfolder:
 //   users/user_model.dart    — AdminUser data class + UserAction enum
 //   users/user_tile.dart     — UserTile, RoleBadge, StatusBadge widgets
 //   users/user_actions.dart  — dialogs, Firestore helpers, details sheet
@@ -120,7 +119,6 @@ class _AdminUsersPageState extends State<AdminUsersPage>
         ],
         body: Column(
           children: [
-            // ── Search bar ─────────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: TextField(
@@ -154,8 +152,6 @@ class _AdminUsersPageState extends State<AdminUsersPage>
                 ),
               ),
             ),
-
-            // ── User list ──────────────────────────────────────────────────
             Expanded(
               child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                 stream: FirebaseFirestore.instance
@@ -167,7 +163,6 @@ class _AdminUsersPageState extends State<AdminUsersPage>
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  // Build AdminUser list from Firestore docs
                   final users = <AdminUser>[];
                   for (final doc in snap.data?.docs ?? const []) {
                     final data = doc.data();
@@ -186,17 +181,14 @@ class _AdminUsersPageState extends State<AdminUsersPage>
                         ? 'banned'
                         : 'active';
 
-                    if (_filterRole != 'all' && role != _filterRole) {
-                      continue;
-                    }
+                    if (_filterRole != 'all' && role != _filterRole) continue;
                     if (_searchQuery.isNotEmpty &&
                         !email.contains(_searchQuery) &&
                         !(data['username'] ?? '')
                             .toString()
                             .toLowerCase()
-                            .contains(_searchQuery)) {
+                            .contains(_searchQuery))
                       continue;
-                    }
 
                     users.add(
                       AdminUser(
@@ -245,10 +237,36 @@ class _AdminUsersPageState extends State<AdminUsersPage>
     );
   }
 
-  // ── Action handler ──────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // ACTION HANDLER
+  //
+  // KEY RULE: Before every `await`, capture what you need from `context`
+  // into a local variable. After every `await`, check `mounted` before
+  // touching `context` again.
+  //
+  // Why: When a dialog closes, Flutter may rebuild/dispose inherited widgets.
+  // Any `context` access (Navigator, ScaffoldMessenger, Theme, etc.) after
+  // an await without a mounted-check causes the
+  // "_dependents.isEmpty is not true" assertion = red screen crash.
+  // ─────────────────────────────────────────────────────────────────────────
   Future<void> _handleAction(AdminUser user, UserAction action) async {
+    // ── Capture BEFORE any await ─────────────────────────────────────────
+    // These are safe to hold across awaits because they don't depend on the
+    // widget tree being alive — they are just Dart objects.
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final nav = Navigator.maybeOf(context);
+
+    // Local helper that uses the pre-captured messenger (safe after awaits)
+    void snack(String msg) {
+      messenger?.showSnackBar(
+        SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
+      );
+    }
+
     switch (action) {
+      // ── View details ────────────────────────────────────────────────────
       case UserAction.viewDetails:
+        // Single await, context used before it — safe.
         await showUserDetailsSheet(
           context,
           email: user.email,
@@ -260,74 +278,94 @@ class _AdminUsersPageState extends State<AdminUsersPage>
         );
         return;
 
+      // ── Promote to admin ────────────────────────────────────────────────
       case UserAction.promoteToAdmin:
         if (user.ref == null) {
-          _snack('Cannot promote unregistered user.');
+          snack('Cannot promote unregistered user.');
           return;
         }
-
-        if (!await showUserConfirmDialog(
+        // Single dialog await — context is still alive here
+        final confirmed = await showUserConfirmDialog(
           context,
           title: 'Promote to Admin?',
           message: 'Grant full admin access to ${user.email}?',
-        ))
-          return;
-
+        );
+        if (!confirmed) return;
+        // After await: use only pre-captured objects or Firestore
         try {
           await user.ref!.update({'role': 'admin'});
-          _snack('✅ ${user.email} promoted to admin');
+          snack('✅ ${user.email} promoted to admin');
         } catch (e) {
-          _snack('Failed to promote: $e');
+          snack('Failed to promote: $e');
         }
         return;
 
+      // ── Demote from admin ───────────────────────────────────────────────
       case UserAction.demoteFromAdmin:
         if (user.ref == null) {
-          _snack('Cannot demote unregistered user.');
+          snack('Cannot demote unregistered user.');
           return;
         }
-
         if (user.email == _myEmail) {
-          _snack('⚠️ You cannot demote yourself');
+          snack('⚠️ You cannot demote yourself');
           return;
         }
-
-        if (!await showUserConfirmDialog(
+        final confirmed = await showUserConfirmDialog(
           context,
           title: 'Demote Admin?',
           message: 'Remove admin access from ${user.email}?',
-        ))
-          return;
-
+        );
+        if (!confirmed) return;
         try {
           await user.ref!.update({'role': 'user'});
-          _snack('User demoted to member');
+          snack('User demoted to member');
         } catch (e) {
-          _snack('Failed to demote: $e');
+          snack('Failed to demote: $e');
         }
         return;
 
+      // ── Ban user ─────────────────────────────────────────────────────────
+      // FIX: This action had TWO awaited dialogs back-to-back.
+      // After the first dialog (text input) closes, `context` enters a
+      // transitional state. Calling showDialog with it immediately causes
+      // the "_dependents.isEmpty" crash.
+      //
+      // Solution: capture `nav` before anything, use `nav.overlay!.context`
+      // for the second dialog so we use the Navigator's stable context
+      // instead of the widget's potentially-stale one.
       case UserAction.banUser:
         if (user.ref == null) {
-          _snack('Cannot ban a user without a profile reference.');
+          snack('Cannot ban a user without a profile reference.');
           return;
         }
 
+        // Step 1: Ask for ban reason (first dialog)
+        // Use widget's context here — it's still alive at this point
         final reason = await showUserTextInputDialog(
           context,
           title: 'Ban Reason',
           hint: 'Why are you banning this user?',
         );
 
+        // Step 2: Check mounted — widget may have rebuilt while dialog was open
+        if (!mounted) return;
         if (reason == null || reason.trim().isEmpty) return;
 
-        if (!await showUserConfirmDialog(
-          context,
-          title: 'Ban User?',
-          message: '${user.email} will be blocked from accessing the app.',
-        ))
-          return;
+        // Step 3: Confirm dialog — FIX: use `nav!.overlay!.context` which is
+        // the Navigator's own stable context, not the widget's context.
+        // This survives the dialog transition without causing the assertion.
+        final overlayContext = nav?.overlay?.context;
+        if (overlayContext == null) return; // navigator gone, abort safely
 
+        final confirmed = await showUserConfirmDialog(
+          overlayContext,
+          title: 'Ban User?',
+          message:
+              '${user.email} will be blocked from the app.\nReason: ${reason.trim()}',
+        );
+        if (!confirmed) return;
+
+        // Step 4: Firestore write + email — no context needed here
         try {
           await user.ref!.update({
             'status': 'banned',
@@ -335,30 +373,27 @@ class _AdminUsersPageState extends State<AdminUsersPage>
             'bannedAt': Timestamp.now(),
             'bannedBy': _myEmail,
           });
-
           await queueEmail(
             user.email,
             'Your SafeSpot account has been suspended',
             'Your account was suspended.\nReason: ${reason.trim()}\n\nIf you believe this is a mistake, please contact support.',
             fromAdmin: _myEmail,
           );
-
-          _snack('User banned and notification queued');
+          snack('🚫 User banned and notification queued');
         } catch (e) {
-          _snack('Error banning user: $e');
+          snack('Error banning user: $e');
         }
         return;
 
+      // ── Unban user ───────────────────────────────────────────────────────
       case UserAction.unbanUser:
         if (user.ref == null) return;
-
-        if (!await showUserConfirmDialog(
+        final confirmed = await showUserConfirmDialog(
           context,
           title: 'Unban User?',
           message: '${user.email} will regain access to the app.',
-        ))
-          return;
-
+        );
+        if (!confirmed) return;
         try {
           await user.ref!.update({
             'status': 'active',
@@ -366,20 +401,20 @@ class _AdminUsersPageState extends State<AdminUsersPage>
             'bannedAt': FieldValue.delete(),
             'bannedBy': FieldValue.delete(),
           });
-
           await queueEmail(
             user.email,
             'Your SafeSpot account has been reactivated',
             'Your account suspension has been lifted. Welcome back!',
             fromAdmin: _myEmail,
           );
-
-          _snack('User unbanned');
+          snack('✅ User unbanned');
         } catch (e) {
-          _snack('Error unbanning user: $e');
+          snack('Error unbanning user: $e');
         }
         return;
 
+      // ── Change username ──────────────────────────────────────────────────
+      // Same two-dialog pattern as banUser — same fix applied.
       case UserAction.changeUsername:
         if (user.ref == null) return;
 
@@ -389,14 +424,18 @@ class _AdminUsersPageState extends State<AdminUsersPage>
           hint: 'Why should this user change their username?',
         );
 
+        if (!mounted) return;
         if (reason == null || reason.trim().isEmpty) return;
 
-        if (!await showUserConfirmDialog(
-          context,
+        final overlayCtx = nav?.overlay?.context;
+        if (overlayCtx == null) return;
+
+        final confirmed = await showUserConfirmDialog(
+          overlayCtx,
           title: 'Send Username Change Request?',
           message: 'An email will be sent to ${user.email}.',
-        ))
-          return;
+        );
+        if (!confirmed) return;
 
         try {
           await user.ref!.update({
@@ -405,36 +444,34 @@ class _AdminUsersPageState extends State<AdminUsersPage>
             'usernameChangeRequestedAt': Timestamp.now(),
             'usernameChangeRequestedBy': _myEmail,
           });
-
           await queueEmail(
             user.email,
             'Action required: Update your SafeSpot username',
             'An admin has requested you change your username.\nReason: ${reason.trim()}',
             fromAdmin: _myEmail,
           );
-
-          _snack('Username change request sent');
+          snack('Username change request sent');
         } catch (e) {
-          _snack('Error: $e');
+          snack('Error: $e');
         }
         return;
 
+      // ── Remove all user data ─────────────────────────────────────────────
+      // Single confirm dialog — standard pattern is fine here.
       case UserAction.removeUserData:
-        if (!await showUserConfirmDialog(
+        final confirmed = await showUserConfirmDialog(
           context,
           title: 'Remove User Data?',
           message:
-              'This permanently deletes all posts, comments, and the profile for ${user.email}. Cannot be undone.',
-        ))
-          return;
+              'Permanently deletes all posts, comments, and the profile for ${user.email}. Cannot be undone.',
+        );
+        if (!confirmed) return;
 
         try {
           final batch = FirebaseFirestore.instance.batch();
-
           await collectForDeletion(batch, 'User Posts', user.email);
           await collectForDeletion(batch, 'Moderated Posts', user.email);
           await collectForDeletion(batch, 'Moderated Comments', user.email);
-
           await batch.commit();
 
           await deleteCollectionGroup('Comments', user.email);
@@ -448,19 +485,11 @@ class _AdminUsersPageState extends State<AdminUsersPage>
             'Your account and all associated data have been permanently removed by a SafeSpot admin.',
             fromAdmin: _myEmail,
           );
-
-          _snack('User data removed');
+          snack('User data removed');
         } catch (e) {
-          _snack('Error removing user data: $e');
+          snack('Error removing user data: $e');
         }
         return;
     }
-  }
-
-  void _snack(String msg) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
-    );
   }
 }

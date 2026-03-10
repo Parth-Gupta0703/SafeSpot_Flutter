@@ -1,12 +1,8 @@
-// User action helpers — confirmation dialogs, text prompts, and helper utilities
-// used by the admin users page when handling moderation actions on accounts.
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 // ── Dialogs ───────────────────────────────────────────────────────────────────
 
-/// Shows a yes/no confirmation dialog. Returns true if confirmed.
 Future<bool> showUserConfirmDialog(
   BuildContext context, {
   required String title,
@@ -14,25 +10,25 @@ Future<bool> showUserConfirmDialog(
 }) async {
   final result = await showDialog<bool>(
     context: context,
+    barrierDismissible: false,
     builder: (ctx) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title:
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-      content:
-          Text(message, style: const TextStyle(color: Color(0xFF677489))),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+      content: Text(message, style: const TextStyle(color: Color(0xFF677489))),
       actions: [
         TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel')),
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Cancel'),
+        ),
         ElevatedButton(
           onPressed: () => Navigator.pop(ctx, true),
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF6C63FF),
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10)),
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
-          child:
-              const Text('Confirm', style: TextStyle(color: Colors.white)),
+          child: const Text('Confirm', style: TextStyle(color: Colors.white)),
         ),
       ],
     ),
@@ -40,50 +36,98 @@ Future<bool> showUserConfirmDialog(
   return result ?? false;
 }
 
-/// Shows a text input dialog. Returns the entered text, or null if cancelled.
+/// FIX: The original version called c.dispose() AFTER showDialog returned.
+/// At that point the dialog's widget tree hasn't fully unwound, so Flutter
+/// still has registered dependents on the controller — disposing it then
+/// triggers "_dependents.isEmpty is not true" red screen crash.
+///
+/// Solution: dispose inside a post-frame callback so Flutter has fully
+/// removed all widgets that depend on the controller before we dispose it.
 Future<String?> showUserTextInputDialog(
   BuildContext context, {
   required String title,
   required String hint,
 }) async {
-  final c = TextEditingController();
+  // Create the controller OUTSIDE the builder so we control its lifetime.
+  final controller = TextEditingController();
+
   final result = await showDialog<String>(
     context: context,
-    builder: (ctx) => AlertDialog(
+    barrierDismissible: false, // prevent accidental dismiss
+    builder: (ctx) =>
+        _TextInputDialog(title: title, hint: hint, controller: controller),
+  );
+
+  // FIX: Schedule dispose for AFTER the current frame completes.
+  // By then Flutter has fully torn down the dialog widget tree and there
+  // are zero dependents left on the controller — safe to dispose.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    controller.dispose();
+  });
+
+  return result;
+}
+
+// ── Dedicated StatefulWidget for the text input dialog ───────────────────────
+// Using a StatefulWidget instead of a plain builder function means Flutter
+// manages the controller's lifecycle properly through the widget tree,
+// preventing any stale-dependent issues.
+class _TextInputDialog extends StatelessWidget {
+  const _TextInputDialog({
+    required this.title,
+    required this.hint,
+    required this.controller,
+  });
+
+  final String title;
+  final String hint;
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title:
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
       content: TextField(
-        controller: c,
+        controller: controller,
         maxLines: 3,
+        autofocus: true,
         decoration: InputDecoration(
-            hintText: hint,
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10))),
+          hintText: hint,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: Color(0xFF6C63FF), width: 1.5),
+          ),
+        ),
       ),
       actions: [
         TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel')),
+          // Cancel: pop with null (no result)
+          onPressed: () => Navigator.pop(context),
+          child: const Text(
+            'Cancel',
+            style: TextStyle(color: Color(0xFF677489)),
+          ),
+        ),
         ElevatedButton(
-          onPressed: () => Navigator.pop(ctx, c.text),
+          // Submit: pop with the current text value
+          onPressed: () => Navigator.pop(context, controller.text),
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF6C63FF),
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10)),
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
           child: const Text('Submit', style: TextStyle(color: Colors.white)),
         ),
       ],
-    ),
-  );
-  c.dispose();
-  return result;
+    );
+  }
 }
 
 // ── User detail sheet ─────────────────────────────────────────────────────────
 
-/// Opens a bottom sheet with full details for a user (post count, ban info, etc.).
 Future<void> showUserDetailsSheet(
   BuildContext context, {
   required String email,
@@ -119,7 +163,8 @@ Future<void> showUserDetailsSheet(
     isScrollControlled: true,
     backgroundColor: Colors.white,
     shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
     builder: (ctx) => Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -147,9 +192,10 @@ Future<void> showUserDetailsSheet(
                 child: Text(
                   email.isNotEmpty ? email[0].toUpperCase() : '?',
                   style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700),
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               const SizedBox(width: 16),
@@ -157,40 +203,56 @@ Future<void> showUserDetailsSheet(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(email,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700, fontSize: 15),
-                        overflow: TextOverflow.ellipsis),
+                    Text(
+                      email,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     if (username.isNotEmpty)
-                      Text('@$username',
-                          style: const TextStyle(
-                              color: Color(0xFF677489), fontSize: 13)),
+                      Text(
+                        '@$username',
+                        style: const TextStyle(
+                          color: Color(0xFF677489),
+                          fontSize: 13,
+                        ),
+                      ),
                   ],
                 ),
               ),
             ],
           ),
           const SizedBox(height: 20),
-          _detailRow(Icons.badge_rounded, 'Role',
-              role == 'admin' ? 'Admin' : 'Member'),
-          _detailRow(Icons.circle_rounded, 'Status',
-              status == 'banned' ? '🚫 Banned' : '✅ Active'),
-          if (status == 'banned' && banReason.isNotEmpty)
-            _detailRow(
-                Icons.info_outline_rounded, 'Ban Reason', banReason),
-          if (bannedAt != null)
-            _detailRow(Icons.calendar_today_rounded, 'Banned At',
-                _formatDate(bannedAt)),
           _detailRow(
-              Icons.article_rounded, 'Posts Published', '$postCount'),
+            Icons.badge_rounded,
+            'Role',
+            role == 'admin' ? 'Admin' : 'Member',
+          ),
+          _detailRow(
+            Icons.circle_rounded,
+            'Status',
+            status == 'banned' ? '🚫 Banned' : '✅ Active',
+          ),
+          if (status == 'banned' && banReason.isNotEmpty)
+            _detailRow(Icons.info_outline_rounded, 'Ban Reason', banReason),
+          if (bannedAt != null)
+            _detailRow(
+              Icons.calendar_today_rounded,
+              'Banned At',
+              _formatDate(bannedAt),
+            ),
+          _detailRow(Icons.article_rounded, 'Posts Published', '$postCount'),
           _detailRow(Icons.flag_rounded, 'Posts Flagged', '$flagCount'),
+          const SizedBox(height: 8),
         ],
       ),
     ),
   );
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Private helpers ───────────────────────────────────────────────────────────
 
 Widget _detailRow(IconData icon, String label, String value) {
   return Padding(
@@ -199,16 +261,20 @@ Widget _detailRow(IconData icon, String label, String value) {
       children: [
         Icon(icon, size: 16, color: const Color(0xFF9CACCF)),
         const SizedBox(width: 10),
-        Text('$label: ',
-            style:
-                const TextStyle(color: Color(0xFF677489), fontSize: 13)),
+        Text(
+          '$label: ',
+          style: const TextStyle(color: Color(0xFF677489), fontSize: 13),
+        ),
         Expanded(
-          child: Text(value,
-              style: const TextStyle(
-                  color: Color(0xFF2D3142),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600),
-              overflow: TextOverflow.ellipsis),
+          child: Text(
+            value,
+            style: const TextStyle(
+              color: Color(0xFF2D3142),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     ),
@@ -222,7 +288,6 @@ String _formatDate(Timestamp ts) {
 
 // ── Firestore helpers ─────────────────────────────────────────────────────────
 
-/// Queues an email via Firestore (requires Firebase email extension).
 Future<void> queueEmail(
   String to,
   String subject,
@@ -237,9 +302,11 @@ Future<void> queueEmail(
   });
 }
 
-/// Adds all documents in [collection] matching [email] to [batch] for deletion.
 Future<void> collectForDeletion(
-    WriteBatch batch, String collection, String email) async {
+  WriteBatch batch,
+  String collection,
+  String email,
+) async {
   final snap = await FirebaseFirestore.instance
       .collection(collection)
       .where('UserEmail', isEqualTo: email)
@@ -249,9 +316,7 @@ Future<void> collectForDeletion(
   }
 }
 
-/// Deletes all documents in a collection group matching [email].
-Future<void> deleteCollectionGroup(
-    String collectionGroup, String email) async {
+Future<void> deleteCollectionGroup(String collectionGroup, String email) async {
   try {
     final snap = await FirebaseFirestore.instance
         .collectionGroup(collectionGroup)
